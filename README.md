@@ -1,49 +1,102 @@
 # Creative Production Workbench
 
-A small proof of concept for creative operations: turn a brief into structured concepts, preserve constraints, record review, and keep provenance visible.
+A small Python proof of concept for creative operations. It keeps one concept in memory: a brief, a list of constraints, alt text, a provenance note, a status, and an event history. Approving the concept requires both alt text and a provenance note.
 
-## Philosophy
+The operator supplies the brief, the constraints, the accessibility text, and the provenance note. This repository records that decision. It does not generate images, store assets, or publish anything.
 
-Creative AI should increase the number of good decisions, not remove creative direction. The operator owns the brief, brand constraints, accessibility requirements, and final approval.
+## Requirements
 
-## What the proof covers
+Python 3.9 or newer. `Concept` uses `list[str]` at runtime, which needs 3.9+. The only dependency is the standard library. GitHub Actions runs the tests on Python 3.12.
 
-- structured creative brief
-- brand and audience constraints
-- concept records
-- review status
-- alt-text requirement
-- provenance note for generated or referenced assets
-- approval before publication
+## Setup
 
-## Run
+Clone the repository and work from its root so `creative` imports as a package:
+
+```bash
+git clone https://github.com/yellowlotuscg/creative-production-workbench.git
+cd creative-production-workbench
+```
+
+There is no install step and no `requirements.txt`.
+
+## Usage
+
+`creative/core.py` defines `Concept` and `approve`. `creative/__init__.py` is empty, so import from `creative.core`.
+
+A `Concept` has these fields:
+
+- `title` (str): short name.
+- `brief` (str): what the concept should show or say.
+- `constraints` (list of str): brand, audience, or production constraints.
+- `alt_text` (str, default `""`): accessibility text for the concept.
+- `provenance` (str, default `""`): where the concept, or a referenced asset, came from.
+- `status` (str, default `"draft"`): `approve` sets this to `"approved"`.
+- `events` (list of str, default empty): `approve` appends `"approved"`.
+
+`approve(concept)` returns the same object after updating it. If `alt_text` or `provenance` is empty, it raises `ValueError` with the message `accessibility and provenance are required` and leaves the concept as it was. Any non-empty string is accepted, including whitespace. Nothing checks whether the text is accurate or useful.
+
+The demo builds one concept and approves it:
 
 ```bash
 python -m creative.demo
-python -m unittest discover -s tests -v
 ```
 
-Synthetic concepts only. No external publishing is performed.
+That prints:
 
-## Implemented
+```text
+Concept(title='Local service story', brief='show a before/after workflow', constraints=['gold and navy brand', 'no generated text in image'], alt_text='A service operator reviewing a clear workflow diagram.', provenance='generated concept; final asset review required', status='approved', events=['approved'])
+```
 
-The repository contains working code, not mockups:
+The same objects from a script:
 
-- A `Concept` record that carries a title, a brief, brand and audience constraints, alt text, a provenance note, a status, and an event history (`creative/core.py`).
-- An approval gate with metadata requirements: approving a concept without both alt text and provenance raises a `ValueError`, so accessibility and provenance are enforced before anything can move to `approved`.
-- A status and event trail: approval flips the concept from `draft` to `approved` and records an `approved` event.
-- A runnable demo (`python -m creative.demo`) that builds a concept with brand constraints, alt text, and a provenance note, then approves it.
+```python
+from creative.core import Concept, approve
 
-## Limitations
+concept = Concept(
+    title="Local service story",
+    brief="show a before/after workflow",
+    constraints=["gold and navy brand", "no generated text in image"],
+    alt_text="A service operator reviewing a clear workflow diagram.",
+    provenance="generated concept; final asset review required",
+)
+approve(concept)
+```
 
-- The workbench models one concept in memory. There is no asset storage, gallery, publishing pipeline, or external system.
-- Approval is a state change only. The code does not publish anywhere and does not enforce a separate human reviewer role.
-- Alt text and provenance are free-text strings. Nothing validates their quality, and there is no image analysis or generation in this proof of concept.
-- Concepts and events disappear when the process exits; there is no database.
-- All concepts are synthetic.
+A concept with the default empty metadata fails approval:
+
+```python
+from creative.core import Concept, approve
+
+approve(Concept("x", "y", []))  # ValueError: accessibility and provenance are required
+```
 
 ## Tests
 
-The standard-library `unittest` suite lives in `tests/test_core.py` and verifies that approval raises a `ValueError` when a concept is missing the required alt text and provenance metadata.
+`tests/test_core.py` uses `unittest`. The one test checks that `approve` raises `ValueError` when alt text and provenance are both left empty.
 
-Run it locally with `python -m unittest discover -s tests -v`. GitHub Actions runs the same command on every push to `main` and every pull request into `main` (see `.github/workflows/tests.yml`), with read-only token permissions and no credentials stored in the workflow.
+From the repository root:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+`.github/workflows/tests.yml` runs that command on Python 3.12 for pushes to `main` and for pull requests into `main`. The workflow permission is `contents: read`.
+
+## Layout
+
+```text
+creative/core.py              Concept and approve
+creative/demo.py              Example that builds and approves one concept
+creative/__init__.py          Empty package marker
+tests/test_core.py            Approval metadata test
+.github/workflows/tests.yml   unittest on Python 3.12
+LICENSE                       MIT License
+```
+
+## Scope
+
+The workbench holds a single concept in process memory. Approval is a status change on that object: `status` becomes `"approved"` and `events` gains `"approved"`. There is no reviewer account, database, file store, gallery, or publishing step. Concepts and events are gone when the process exits. Every example in this repository is synthetic.
+
+## License
+
+Released under the MIT License. Copyright (c) 2026 Matthew Coggins. See [LICENSE](LICENSE).
